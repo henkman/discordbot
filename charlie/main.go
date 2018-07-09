@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -35,7 +35,7 @@ func main() {
 	}
 	dg, err := discordgo.New("Bot " + opts.Token)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	var tg markov.TextGenerator
@@ -43,7 +43,7 @@ func main() {
 	dg.AddHandler(onReady(&tg, opts.MaxHistory))
 	dg.AddHandler(onMessage(&tg, opts.MinWords, opts.MaxWords))
 	if err := dg.Open(); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	sc := make(chan os.Signal, 1)
@@ -72,7 +72,7 @@ func onReady(tg *markov.TextGenerator, maxHistory int) interface{} {
 		}
 		var buf bytes.Buffer
 		for _, g := range gs {
-			fmt.Println("reading guild", g.Name)
+			log.Println("reading guild", g.Name)
 			chs, err := s.GuildChannels(g.ID)
 			if err != nil {
 				s.Close()
@@ -83,7 +83,7 @@ func onReady(tg *markov.TextGenerator, maxHistory int) interface{} {
 				if ch.Type != discordgo.ChannelTypeGuildText {
 					continue
 				}
-				fmt.Println("reading channel", ch.Name)
+				log.Println("reading channel", ch.Name)
 				n := 0
 				before := ""
 				for {
@@ -96,13 +96,13 @@ func onReady(tg *markov.TextGenerator, maxHistory int) interface{} {
 						break
 					}
 					for _, m := range ms {
-						if m.Author.ID == s.State.User.ID || !isValidMessageContent(m.Content) {
+						if m.Author.ID == s.State.User.ID ||
+							!isValidMessageContent(m.Content) {
 							continue
 						}
 						msg := m.Content
 						msg = reReplaceEmotes.ReplaceAllString(msg, "$1")
 						msg = strings.ToLower(msg)
-						fmt.Println(msg)
 						buf.WriteString(msg)
 						tg.Feed(&buf)
 						buf.Reset()
@@ -140,14 +140,13 @@ func onMessage(tg *markov.TextGenerator, minWords, maxWords uint) interface{} {
 				!isValidMessageContent(m.Content) {
 				return
 			}
-			fmt.Println("feed:", msg)
 			tg.Feed(bytes.NewBufferString(msg))
 			return
 		}
 		x := mr.Int31n(int32(maxWords-minWords)+1) + int32(minWords)
 		text := WordJoin(tg.Generate(uint(x)))
-		s.ChannelMessageSend(m.ChannelID, text)
 		go s.ChannelMessageDelete(m.ChannelID, m.ID)
+		s.ChannelMessageSend(m.ChannelID, text)
 	}
 }
 
@@ -161,9 +160,9 @@ func WordJoin(words []string) string {
 			fc := []rune(next)[0]
 			word := []rune(words[i])
 			lc := word[len(word)-1]
-			if lc == '.' || lc == ',' || lc == '?' ||
-				lc == '!' || lc == ';' || (unicode.IsLetter(lc) || unicode.IsDigit(lc)) &&
-				(unicode.IsLetter(fc) || unicode.IsDigit(fc)) {
+			if lc == '.' || lc == ',' || lc == '?' || lc == '!' || lc == ';' ||
+				(unicode.IsLetter(lc) || unicode.IsDigit(lc)) &&
+					(unicode.IsLetter(fc) || unicode.IsDigit(fc)) {
 				text += " "
 			}
 		}
